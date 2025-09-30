@@ -5,6 +5,8 @@ const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
 const fs = require('fs');
+const cron = require('node-cron');
+const fetch = require('node-fetch');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -270,6 +272,27 @@ app.delete('/api/images/:id', isAdmin, (req, res) => {
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
+});
+// Self-ping to prevent sleeping
+const RENDER_URL = process.env.RENDER_URL || `http://localhost:${PORT}`;
+
+cron.schedule('*/14 * * * *', async () => {
+  try {
+    console.log('⏰ Pinging server to prevent sleep...');
+    const response = await fetch(RENDER_URL);
+    const status = response.status;
+    console.log(`✅ Ping successful! Status: ${status}`);
+  } catch (error) {
+    console.error('❌ Ping failed:', error.message);
+  }
+});
+
+console.log('🔔 Cron job initialized - Server will self-ping every 14 minutes');
+
+// Start server
+app.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Admin login: ${process.env.ADMIN_USERNAME} / ${process.env.ADMIN_PASSWORD}`);
 });
 
 // Start server
