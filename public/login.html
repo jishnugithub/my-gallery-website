@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Image Gallery</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">My Gallery</h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="gallery.html">Gallery</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="auth-container">
+            <div class="auth-box">
+                <h2 id="authTitle">Login</h2>
+                
+                <form id="authForm">
+                    <div class="form-group">
+                        <label for="username">Username</label>
+                        <input type="text" id="username" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" required>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-primary">Login</button>
+                    
+                    <div id="errorMsg" class="error-msg"></div>
+                    <div id="successMsg" class="success-msg"></div>
+                </form>
+                
+                <div class="auth-switch">
+                    <p>Don't have an account? <a href="#" id="switchAuth">Sign Up</a></p>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        let isLoginMode = true;
+        const form = document.getElementById('authForm');
+        const authTitle = document.getElementById('authTitle');
+        const switchLink = document.getElementById('switchAuth');
+        const errorMsg = document.getElementById('errorMsg');
+        const successMsg = document.getElementById('successMsg');
+
+        // Switch between login and signup
+        switchLink.addEventListener('click', (e) => {
+            e.preventDefault();
+            isLoginMode = !isLoginMode;
+            
+            if (isLoginMode) {
+                authTitle.textContent = 'Login';
+                form.querySelector('button').textContent = 'Login';
+                switchLink.innerHTML = 'Don\'t have an account? <a href="#">Sign Up</a>';
+            } else {
+                authTitle.textContent = 'Sign Up';
+                form.querySelector('button').textContent = 'Sign Up';
+                switchLink.innerHTML = 'Already have an account? <a href="#">Login</a>';
+            }
+            
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+        });
+
+        // Form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            
+            errorMsg.textContent = '';
+            successMsg.textContent = '';
+            
+            const endpoint = isLoginMode ? '/api/login' : '/api/signup';
+            
+            try {
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    successMsg.textContent = data.message;
+                    
+                    if (isLoginMode) {
+                        // Redirect based on user type
+                        setTimeout(() => {
+                            window.location.href = data.isAdmin ? 'admin.html' : 'gallery.html';
+                        }, 1000);
+                    } else {
+                        // After signup, switch to login
+                        setTimeout(() => {
+                            switchLink.click();
+                            successMsg.textContent = 'Account created! Please login.';
+                        }, 1500);
+                    }
+                } else {
+                    errorMsg.textContent = data.error;
+                }
+            } catch (error) {
+                errorMsg.textContent = 'Connection error. Please try again.';
+            }
+        });
+
+        // Check if already logged in
+        fetch('/api/check-auth')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    window.location.href = data.isAdmin ? 'admin.html' : 'gallery.html';
+                }
+            });
+    </script>
+</body>
+</html>

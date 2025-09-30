@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Image Gallery - Home</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">My Gallery</h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="gallery.html">Gallery</a>
+                <a href="login.html" id="loginBtn">Login</a>
+                <a href="#" id="logoutBtn" style="display: none;">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="hero">
+            <h1>Welcome to My Image Gallery</h1>
+            <p>Explore our curated collection of beautiful images</p>
+            <div class="hero-buttons">
+                <a href="gallery.html" class="btn btn-primary">View Gallery</a>
+                <a href="login.html" class="btn btn-secondary" id="adminBtn">Admin Login</a>
+            </div>
+        </div>
+
+        <section class="features">
+            <div class="feature">
+                <h3>📸 High Quality</h3>
+                <p>Professional photography and images</p>
+            </div>
+            <div class="feature">
+                <h3>🗂️ Organized</h3>
+                <p>Browse by categories</p>
+            </div>
+            <div class="feature">
+                <h3>🔒 Protected</h3>
+                <p>Download protection enabled</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>&copy; 2025 My Image Gallery. All rights reserved.</p>
+    </footer>
+
+    <script>
+        // Check if user is logged in
+        fetch('/api/check-auth')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    document.getElementById('loginBtn').style.display = 'none';
+                    document.getElementById('logoutBtn').style.display = 'block';
+                    
+                    if (data.isAdmin) {
+                        document.getElementById('adminBtn').textContent = 'Admin Dashboard';
+                        document.getElementById('adminBtn').href = 'admin.html';
+                    }
+                }
+            });
+
+        // Logout functionality
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => {
+                    window.location.href = 'index.html';
+                });
+        });
+    </script>
+</body>
+</html>

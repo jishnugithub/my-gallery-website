@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gallery - Image Gallery</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Disable right-click and text selection */
+        body {
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
+        }
+        
+        img {
+            pointer-events: none;
+            -webkit-user-drag: none;
+            -khtml-user-drag: none;
+            -moz-user-drag: none;
+            -o-user-drag: none;
+        }
+    </style>
+</head>
+<body oncontextmenu="return false;">
+    <nav class="navbar">
+        <div class="container">
+            <h1 class="logo">Gallery</h1>
+            <div class="nav-links">
+                <a href="index.html">Home</a>
+                <a href="gallery.html">Gallery</a>
+                <a href="login.html" id="loginBtn">Login</a>
+                <a href="#" id="logoutBtn" style="display: none;">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="gallery-header">
+            <h1>Image Gallery</h1>
+            <div class="filter-section">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="galleryGrid" class="images-grid"></div>
+        
+        <div id="noImages" style="display: none; text-align: center; padding: 50px;">
+            <p>No images available yet.</p>
+        </div>
+    </main>
+
+    <!-- Image Modal -->
+    <div id="imageModal" class="modal">
+        <span class="modal-close">&times;</span>
+        <img class="modal-content" id="modalImage">
+        <div id="modalCaption"></div>
+    </div>
+
+    <footer>
+        <p>&copy; 2025 My Image Gallery. All rights reserved.</p>
+    </footer>
+
+    <script>
+        let categories = [];
+        let images = [];
+
+        // Disable common screenshot shortcuts
+        document.addEventListener('keyup', (e) => {
+            if (e.key == 'PrintScreen') {
+                navigator.clipboard.writeText('');
+                alert('Screenshots are disabled!');
+            }
+        });
+
+        document.addEventListener('keydown', (e) => {
+            // Disable F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+            if (e.keyCode == 123 || 
+                (e.ctrlKey && e.shiftKey && e.keyCode == 'I'.charCodeAt(0)) ||
+                (e.ctrlKey && e.shiftKey && e.keyCode == 'J'.charCodeAt(0)) ||
+                (e.ctrlKey && e.keyCode == 'U'.charCodeAt(0))) {
+                e.preventDefault();
+                return false;
+            }
+        });
+
+        // Check authentication
+        fetch('/api/check-auth')
+            .then(res => res.json())
+            .then(data => {
+                if (data.authenticated) {
+                    document.getElementById('loginBtn').style.display = 'none';
+                    document.getElementById('logoutBtn').style.display = 'block';
+                }
+            });
+
+        // Logout
+        document.getElementById('logoutBtn')?.addEventListener('click', (e) => {
+            e.preventDefault();
+            fetch('/api/logout', { method: 'POST' })
+                .then(() => window.location.href = 'index.html');
+        });
+
+        // Load categories
+        async function loadCategories() {
+            const res = await fetch('/api/categories');
+            categories = await res.json();
+            
+            const filter = document.getElementById('categoryFilter');
+            filter.innerHTML = '<option value="">All Categories</option>';
+            
+            categories.forEach(cat => {
+                filter.innerHTML += `<option value="${cat.id}">${cat.name}</option>`;
+            });
+        }
+
+        // Load images
+        async function loadImages(categoryId = '') {
+            const url = categoryId ? `/api/images?categoryId=${categoryId}` : '/api/images';
+            const res = await fetch(url);
+            images = await res.json();
+            
+            const galleryGrid = document.getElementById('galleryGrid');
+            const noImages = document.getElementById('noImages');
+            
+            if (images.length === 0) {
+                galleryGrid.style.display = 'none';
+                noImages.style.display = 'block';
+                return;
+            }
+            
+            galleryGrid.style.display = 'grid';
+            noImages.style.display = 'none';
+            
+            galleryGrid.innerHTML = images.map(img => {
+                const category = categories.find(c => c.id === img.categoryId);
+                return `
+                    <div class="gallery-item" onclick="openModal('${img.path}', '${img.originalName}')">
+                        <img src="${img.path}" alt="${img.originalName}" draggable="false">
+                        <div class="gallery-overlay">
+                            <p>${img.originalName}</p>
+                            <span>${category ? category.name : 'Uncategorized'}</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Filter images
+        document.getElementById('categoryFilter').addEventListener('change', (e) => {
+            loadImages(e.target.value);
+        });
+
+        // Modal functionality
+        const modal = document.getElementById('imageModal');
+        const modalImg = document.getElementById('modalImage');
+        const modalCaption = document.getElementById('modalCaption');
+        const closeBtn = document.querySelector('.modal-close');
+
+        function openModal(imgSrc, caption) {
+            modal.style.display = 'block';
+            modalImg.src = imgSrc;
+            modalCaption.textContent = caption;
+        }
+
+        closeBtn.onclick = function() {
+            modal.style.display = 'none';
+        }
+
+        modal.onclick = function(e) {
+            if (e.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+
+        // Initialize
+        loadCategories();
+        loadImages();
+    </script>
+</body>
+</html>

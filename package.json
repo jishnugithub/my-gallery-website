@@ -1,0 +1,20 @@
+
+{
+  "name": "image-gallery-website",
+  "version": "1.0.0",
+  "description": "Full authenticated image gallery with categories",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": ["gallery", "images", "authentication"],
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {
+    "express": "^4.18.2",
+    "express-fileupload": "^1.4.0",
+    "express-session": "^1.17.3",
+    "bcryptjs": "^2.4.3",
+    "dotenv": "^16.3.1"
+  }
+}
