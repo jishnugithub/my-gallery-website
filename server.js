@@ -4,12 +4,20 @@ const fileUpload = require('express-fileupload');
 const session = require('express-session');
 const bcrypt = require('bcryptjs');
 const path = require('path');
-const fs = require('fs');
 const cron = require('node-cron');
 const fetch = require('node-fetch');
+const cloudinary = require('cloudinary').v2;
+const streamifier = require('streamifier');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
+});
 
 // In-memory database (for simplicity - in production use a real database)
 let users = [];
@@ -26,7 +34,6 @@ app.use(express.static('public', {
     }
   }
 }));
-app.use('/uploads', express.static('uploads'));
 app.use(fileUpload({
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max file size
   abortOnLimit: true
@@ -42,11 +49,6 @@ app.use(session({
     maxAge: 24 * 60 * 60 * 1000 // 24 hours
   }
 }));
-
-// Create uploads directory if it doesn't exist
-if (!fs.existsSync('uploads')) {
-  fs.mkdirSync('uploads');
-}
 
 // Initialize with default admin user
 async function initializeAdmin() {
@@ -182,8 +184,8 @@ app.get('/api/categories', (req, res) => {
   res.json(categories);
 });
 
-// Upload image (admin only)
-app.post('/api/upload', isAdmin, (req, res) => {
+// Upload image to Cloudinary (admin only)
+app.post('/api/upload', isAdmin, async (req, res) => {
   try {
     if (!req.files || !req.files.image) {
       return res.status(400).json({ error: 'No image uploaded' });
@@ -193,36 +195,49 @@ app.post('/api/upload', isAdmin, (req, res) => {
     const image = req.files.image;
 
     // Validate file type
-    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif'];
+    const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
     if (!allowedTypes.includes(image.mimetype)) {
       return res.status(400).json({ error: 'Only image files allowed' });
     }
 
-    // Generate unique filename
-    const fileName = Date.now() + '-' + image.name.replace(/\s/g, '-');
-    const uploadPath = path.join(__dirname, 'uploads', fileName);
+    // Upload to Cloudinary using upload_stream
+    const uploadPromise = new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          folder: 'gallery_uploads',
+          resource_type: 'auto',
+          transformation: [
+            { width: 1500, height: 1500, crop: 'limit' }
+          ]
+        },
+        (error, result) => {
+          if (error) reject(error);
+          else resolve(result);
+        }
+      );
 
-    // Move file to uploads directory
-    image.mv(uploadPath, (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Failed to upload image' });
-      }
-
-      const newImage = {
-        id: images.length + 1,
-        fileName,
-        originalName: image.name,
-        categoryId: parseInt(categoryId),
-        uploadedBy: req.session.username,
-        uploadedAt: new Date(),
-        path: '/uploads/' + fileName
-      };
-
-      images.push(newImage);
-      res.json(newImage);
+      streamifier.createReadStream(image.data).pipe(uploadStream);
     });
+
+    const result = await uploadPromise;
+
+    const newImage = {
+      id: images.length + 1,
+      fileName: image.name,
+      originalName: image.name,
+      cloudinaryUrl: result.secure_url,
+      cloudinaryPublicId: result.public_id,
+      categoryId: parseInt(categoryId),
+      uploadedBy: req.session.username,
+      uploadedAt: new Date(),
+      path: result.secure_url // Use Cloudinary URL
+    };
+
+    images.push(newImage);
+    res.json(newImage);
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Upload error:', error);
+    res.status(500).json({ error: 'Failed to upload image to Cloudinary' });
   }
 });
 
@@ -239,7 +254,7 @@ app.get('/api/images', (req, res) => {
 });
 
 // Download image (admin only)
-app.get('/api/download/:id', isAdmin, (req, res) => {
+app.get('/api/download/:id', isAdmin, async (req, res) => {
   try {
     const imageId = parseInt(req.params.id);
     const image = images.find(img => img.id === imageId);
@@ -248,15 +263,15 @@ app.get('/api/download/:id', isAdmin, (req, res) => {
       return res.status(404).json({ error: 'Image not found' });
     }
 
-    const filePath = path.join(__dirname, 'uploads', image.fileName);
-    res.download(filePath, image.originalName);
+    // Redirect to Cloudinary URL for download
+    res.redirect(image.cloudinaryUrl);
   } catch (error) {
     res.status(500).json({ error: 'Server error' });
   }
 });
 
 // Delete image (admin only)
-app.delete('/api/images/:id', isAdmin, (req, res) => {
+app.delete('/api/images/:id', isAdmin, async (req, res) => {
   try {
     const imageId = parseInt(req.params.id);
     const imageIndex = images.findIndex(img => img.id === imageId);
@@ -266,19 +281,20 @@ app.delete('/api/images/:id', isAdmin, (req, res) => {
     }
 
     const image = images[imageIndex];
-    const filePath = path.join(__dirname, 'uploads', image.fileName);
 
-    // Delete file from disk
-    fs.unlinkSync(filePath);
+    // Delete from Cloudinary
+    await cloudinary.uploader.destroy(image.cloudinaryPublicId);
 
     // Remove from array
     images.splice(imageIndex, 1);
 
     res.json({ message: 'Image deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Server error' });
+    console.error('Delete error:', error);
+    res.status(500).json({ error: 'Failed to delete image' });
   }
 });
+
 // Self-ping to prevent sleeping
 const RENDER_URL = process.env.RENDER_URL || `http://localhost:${PORT}`;
 
@@ -295,10 +311,9 @@ cron.schedule('*/14 * * * *', async () => {
 
 console.log('🔔 Cron job initialized - Server will self-ping every 14 minutes');
 
-
-
 // Start server
 app.listen(PORT, () => {
   console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Admin login: ${process.env.ADMIN_USERNAME} / ${process.env.ADMIN_PASSWORD}`);
+  console.log(`Admin login: ${process.env.ADMIN_USERNAME || 'admin'} / ${process.env.ADMIN_PASSWORD || 'admin123'}`);
+  console.log('Cloudinary configured for persistent image storage');
 });

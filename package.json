@@ -1,4 +1,3 @@
-
 {
   "name": "image-gallery-website",
   "version": "1.0.0",
@@ -7,16 +6,24 @@
   "scripts": {
     "start": "node server.js"
   },
-  "keywords": ["gallery", "images", "authentication"],
+  "keywords": [
+    "gallery",
+    "images",
+    "authentication"
+  ],
   "author": "Your Name",
   "license": "MIT",
   "dependencies": {
+    "bcryptjs": "^2.4.3",
+    "cloudinary": "^1.41.3",
+    "dotenv": "^16.3.1",
     "express": "^4.18.2",
     "express-fileupload": "^1.4.0",
     "express-session": "^1.17.3",
-    "bcryptjs": "^2.4.3",
-    "dotenv": "^16.3.1",
+    "multer": "^2.0.2",
+    "multer-storage-cloudinary": "^4.0.0",
     "node-cron": "^3.0.3",
-    "node-fetch": "^2.7.0"
+    "node-fetch": "^2.7.0",
+    "streamifier": "^0.1.1"
   }
 }
