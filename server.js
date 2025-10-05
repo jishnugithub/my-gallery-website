@@ -289,11 +289,7 @@ cron.schedule('*/14 * * * *', async () => {
 
 console.log('🔔 Cron job initialized - Server will self-ping every 14 minutes');
 
-// Start server
-app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`Admin login: ${process.env.ADMIN_USERNAME} / ${process.env.ADMIN_PASSWORD}`);
-});
+
 
 // Start server
 app.listen(PORT, () => {
