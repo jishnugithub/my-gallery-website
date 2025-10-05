@@ -31,7 +31,7 @@
         </div>
 
         <div class="admin-section">
-            <h2>Upload Image</h2>
+            <h2>Upload Images</h2>
             <form id="uploadForm">
                 <div class="form-group">
                     <select id="categorySelect" required>
@@ -39,7 +39,10 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <input type="file" id="imageFile" accept="image/*" required>
+                    <input type="file" id="imageFile" accept="image/*" multiple required>
+                    <small style="color: #b0b0b0; display: block; margin-top: 8px;">
+                        💡 Hold Ctrl (Windows) or Cmd (Mac) to select multiple images at once
+                    </small>
                 </div>
                 <button type="submit" class="btn btn-primary">Upload</button>
                 <div id="uploadMsg" class="success-msg"></div>
@@ -120,35 +123,71 @@
             }
         });
 
-        // Upload image
+        // Upload images (supports multiple files)
         document.getElementById('uploadForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
-            const formData = new FormData();
-            formData.append('image', document.getElementById('imageFile').files[0]);
-            formData.append('categoryId', document.getElementById('categorySelect').value);
+            const files = document.getElementById('imageFile').files;
+            const categoryId = document.getElementById('categorySelect').value;
             
-            document.getElementById('uploadProgress').textContent = 'Uploading...';
-            
-            const res = await fetch('/api/upload', {
-                method: 'POST',
-                body: formData
-            });
-            
-            const data = await res.json();
-            
-            if (res.ok) {
-                document.getElementById('uploadMsg').textContent = 'Image uploaded successfully!';
-                document.getElementById('uploadForm').reset();
-                loadImages();
-                setTimeout(() => {
-                    document.getElementById('uploadMsg').textContent = '';
-                }, 3000);
-            } else {
-                document.getElementById('uploadMsg').textContent = data.error;
+            if (files.length === 0) {
+                document.getElementById('uploadMsg').textContent = 'Please select at least one image';
+                document.getElementById('uploadMsg').style.color = '#ff6b6b';
+                return;
             }
             
+            document.getElementById('uploadProgress').textContent = `Uploading ${files.length} image(s)...`;
+            document.getElementById('uploadMsg').textContent = '';
+            
+            let successCount = 0;
+            let errorCount = 0;
+            
+            // Upload each file
+            for (let i = 0; i < files.length; i++) {
+                const formData = new FormData();
+                formData.append('image', files[i]);
+                formData.append('categoryId', categoryId);
+                
+                document.getElementById('uploadProgress').textContent = 
+                    `Uploading ${i + 1} of ${files.length}... (${successCount} successful)`;
+                
+                try {
+                    const res = await fetch('/api/upload', {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (res.ok) {
+                        successCount++;
+                    } else {
+                        errorCount++;
+                        const data = await res.json();
+                        console.error(`Failed to upload ${files[i].name}:`, data.error);
+                    }
+                } catch (error) {
+                    errorCount++;
+                    console.error(`Error uploading ${files[i].name}:`, error);
+                }
+            }
+            
+            // Show results
+            if (errorCount === 0) {
+                document.getElementById('uploadMsg').textContent = 
+                    `✅ Successfully uploaded ${successCount} image(s)!`;
+                document.getElementById('uploadMsg').style.color = '#51cf66';
+            } else {
+                document.getElementById('uploadMsg').textContent = 
+                    `⚠️ Uploaded ${successCount} image(s), ${errorCount} failed`;
+                document.getElementById('uploadMsg').style.color = '#ffa94d';
+            }
+            
+            document.getElementById('uploadForm').reset();
+            loadImages();
             document.getElementById('uploadProgress').textContent = '';
+            
+            setTimeout(() => {
+                document.getElementById('uploadMsg').textContent = '';
+            }, 5000);
         });
 
         // Load images
